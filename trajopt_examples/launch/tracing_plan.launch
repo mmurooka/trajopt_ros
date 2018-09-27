@@ -26,6 +26,11 @@
 
   <node pkg="trajopt_examples" type="trajopt_examples_tracing_plan" name="trajopt_examples_tracing_plan"
         output="screen" >
-    <param name="plotting" type="bool" value="$(arg plotting)"/>
+    <rosparam subst_value="true">
+      steps_per_distance: 20
+      move_group: right_arm
+      target_link: RARM_JOINT5_Link
+      plotting: $(arg plotting)
+    </rosparam>
   </node>
 </launch>

@@ -45,6 +45,7 @@ const std::string ROBOT_DESCRIPTION_PARAM = "robot_description"; /**< Default RO
 const std::string ROBOT_SEMANTIC_PARAM = "robot_description_semantic"; /**< Default ROS parameter for robot
                                                                           description */
 
+int steps_per_distance_ = 5;
 bool plotting_ = false;
 urdf::ModelInterfaceSharedPtr urdf_model_; /**< URDF Model */
 srdf::ModelSharedPtr srdf_model_;          /**< SRDF Model */
@@ -52,96 +53,57 @@ tesseract_ros::KDLEnvPtr env_;             /**< Trajopt Basic Environment */
 
 ros::Publisher cart_traj_pub_;
 
-static VectorIsometry3d makeTracingPoses()
-{
-  VectorIsometry3d path;  // results
-  std::ifstream indata;            // input file
-
-  // You could load your parts from anywhere, but we are transporting them with
-  // the git repo
-  std::string filename = ros::package::getPath("trajopt_examples") + "/config/circle.csv";
-
-  // In a non-trivial app, you'll of course want to check that calls like 'open'
-  // succeeded
-  indata.open(filename);
-
-  std::string line;
-  int lnum = 0;
-  while (std::getline(indata, line))
-  {
-    ++lnum;
-    if (lnum < 3)
-      continue;
-
-    std::stringstream lineStream(line);
-    std::string cell;
-    Eigen::Matrix<double, 6, 1> xyzijk;
-    int i = -2;
-    while (std::getline(lineStream, cell, ','))
-    {
-      ++i;
-      if (i == -1)
-        continue;
-
-      xyzijk(i) = std::stod(cell);
-    }
-
-    Eigen::Vector3d pos = xyzijk.head<3>();
-    pos = pos / 1000.0;  // Most things in ROS use meters as the unit of length.
-                         // Our part was exported in mm.
-    Eigen::Vector3d norm = xyzijk.tail<3>();
-    norm.normalize();
-
-    // This code computes two extra directions to turn the normal direction into
-    // a full defined frame. Descartes
-    // will search around this frame for extra poses, so the exact values do not
-    // matter as long they are valid.
-    Eigen::Vector3d temp_x = (-1 * pos).normalized();
-    Eigen::Vector3d y_axis = (norm.cross(temp_x)).normalized();
-    Eigen::Vector3d x_axis = (y_axis.cross(norm)).normalized();
-    Eigen::Isometry3d pose;
-    pose.matrix().col(0).head<3>() = norm;
-    pose.matrix().col(1).head<3>() = x_axis;
-    pose.matrix().col(2).head<3>() = y_axis;
-    pose.matrix().col(3).head<3>() = pos;
-
-    path.push_back(pose);
-  }
-  indata.close();
-
-  return path;
-}
+std::string move_group_name_;
+std::string target_link_name_;
 
 ProblemConstructionInfo cppMethod()
 {
   ProblemConstructionInfo pci(env_);
 
-  VectorIsometry3d tool_poses = makeTracingPoses();
-
   // Populate Basic Info
-  pci.basic_info.n_steps = tool_poses.size();
-  pci.basic_info.manip = "right_arm";
+  pci.basic_info.manip = move_group_name_;
   pci.basic_info.start_fixed = false;
-
-  pci.opt_info.max_iter = 200;
-  pci.opt_info.min_approx_improve = 1e-3;
-  pci.opt_info.min_trust_box_size = 1e-3;
+  // pci.opt_info.max_iter = 200;
+  // pci.opt_info.min_approx_improve = 1e-3;
+  // pci.opt_info.min_trust_box_size = 1e-3;
 
   // Create Kinematic Object
   pci.kin = pci.env->getManipulator(pci.basic_info.manip);
-  ROS_INFO("Movegroup: %s", pci.kin->getName().c_str());
 
-  // Populate Init Info
-  Eigen::VectorXd start_pos = pci.env->getCurrentJointValues(pci.kin->getName());
+  // Populate Constraints
+  vector<Eigen::Vector3d> key_point_list // point list for Capital N
+    = {Eigen::Vector3d(0.3, -0.4, 0.2),
+       Eigen::Vector3d(0.3, -0.4, 0.6),
+       Eigen::Vector3d(0.3, -0.1, 0.2),
+       Eigen::Vector3d(0.3, -0.1, 0.6)};
+  unsigned int n_steps = 0;
+  for (unsigned int k = 0; k < key_point_list.size() - 1; ++k) {
+    Eigen::Vector3d start_point = key_point_list[k];
+    Eigen::Vector3d end_point = key_point_list[k+1];
+    double distance = (start_point - end_point).norm();
+    unsigned int steps = int(distance * steps_per_distance_);
+    for (unsigned int i = 0; i < steps; ++i) {
+      double ratio = double(i) / (steps - 1);
+      std::shared_ptr<StaticPoseCostInfo> pose = std::shared_ptr<StaticPoseCostInfo>(new StaticPoseCostInfo);
+      pose->term_type = TT_CNT;
+      pose->name = "waypoint_cart_" + std::to_string(i);
+      pose->timestep = n_steps;
+      pose->link = target_link_name_;
+      pose->xyz = start_point * (1.0 - ratio) + end_point * ratio;
+      pose->wxyz = Eigen::Vector4d(0.0, 0.0, 1.0, 0.0);
+      pose->pos_coeffs = Eigen::Vector3d(10, 10, 10);
+      pose->rot_coeffs = Eigen::Vector3d(10, 10, 10);
 
-  pci.init_info.type = InitInfo::GIVEN_TRAJ;
-  pci.init_info.data = start_pos.transpose().replicate(pci.basic_info.n_steps, 1);
-  //  pci.init_info.data.col(6) = VectorXd::LinSpaced(steps_, start_pos[6],
-  //  end_pos[6]);
+      pci.cnt_infos.push_back(pose);
+      n_steps++;
+    }
+  }
+
+  // Set Number of Steps
+  pci.basic_info.n_steps = n_steps;
 
   // Populate Cost Info
   unsigned int num_joints = pci.kin->numJoints();
-  ROS_INFO("Number of joints: %d", num_joints);
 
   std::shared_ptr<JointVelCostInfo> joint_vel = std::shared_ptr<JointVelCostInfo>(new JointVelCostInfo);
   joint_vel->coeffs = std::vector<double>(num_joints, 1.0); // <= depends on joint_number
@@ -171,34 +133,30 @@ ProblemConstructionInfo cppMethod()
   collision->info = createSafetyMarginDataVector(pci.basic_info.n_steps, 0.025, 20);
   pci.cost_infos.push_back(collision);
 
-  // Populate Constraints
-  for (auto i = 0; i < pci.basic_info.n_steps; ++i)
-  {
-    std::shared_ptr<PoseCostInfo> pose = std::shared_ptr<PoseCostInfo>(new PoseCostInfo);
-    pose->term_type = TT_CNT;
-    pose->name = "waypoint_cart_" + std::to_string(i);
-    pose->target = "WAIST";
-    pose->timestep = i;
-
-    pose->link = "RARM_JOINT5_Link";
-    pose->tcp = tool_poses[i];
-    pose->pos_coeffs = Eigen::Vector3d(100, 100, 100);
-    pose->rot_coeffs = Eigen::Vector3d(0, 0, 0);
-
-    pci.cnt_infos.push_back(pose);
-  }
+  // Populate Init Info
+  Eigen::VectorXd start_pos = pci.env->getCurrentJointValues(pci.kin->getName());
+  pci.init_info.type = InitInfo::STATIONARY;
+  // pci.init_info.type = InitInfo::GIVEN_TRAJ;
+  pci.init_info.data = start_pos.transpose().replicate(pci.basic_info.n_steps, 1);
 
   // publish PoseArray of cartesian trajectory
-  geometry_msgs::PoseArray pose_array_msg;
-  pose_array_msg.header.frame_id = "WAIST";
-  pose_array_msg.header.stamp = ros::Time::now();
-  for (auto i = 0; i < pci.basic_info.n_steps; ++i)
-  {
-    geometry_msgs::Pose pose_msg;
-    tf::poseEigenToMsg(tool_poses[i], pose_msg);
-    pose_array_msg.poses.push_back(pose_msg);
-  }
-  cart_traj_pub_.publish(pose_array_msg);
+  // geometry_msgs::PoseArray pose_array_msg;
+  // pose_array_msg.header.frame_id = "world";
+  // pose_array_msg.header.stamp = ros::Time::now();
+  // for (auto i = 0; i < pci.basic_info.n_steps; ++i)
+  // {
+  //   geometry_msgs::Pose pose_msg;
+  //   tf::poseEigenToMsg(tool_poses[i], pose_msg);
+  //   pose_array_msg.poses.push_back(pose_msg);
+  // }
+  // cart_traj_pub_.publish(pose_array_msg);
+
+  ROS_INFO("=== ProblemConstructionInfo ===");
+  ROS_INFO("Steps per distance: %d", steps_per_distance_);
+  ROS_INFO("Number of steps: %d", pci.basic_info.n_steps);
+  ROS_INFO("Movegroup: %s", pci.kin->getName().c_str());
+  ROS_INFO("Target link: %s", target_link_name_.c_str());
+  ROS_INFO("Number of joints: %d", num_joints);
 
   return pci;
 }
@@ -231,6 +189,9 @@ int main(int argc, char** argv)
   tesseract_ros::ROSBasicPlottingPtr plotter(new tesseract_ros::ROSBasicPlotting(env_));
 
   // Get ROS Parameters
+  pnh.param("move_group", move_group_name_, move_group_name_);
+  pnh.param("target_link", target_link_name_, target_link_name_);
+  pnh.param<int>("steps_per_distance", steps_per_distance_, steps_per_distance_);
   pnh.param("plotting", plotting_, plotting_);
 
   // Set the robot initial state
