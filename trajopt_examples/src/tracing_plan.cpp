@@ -1,13 +1,11 @@
 /**
- * @file puzzle_piece_plan.cpp
+ * @file tracing_plan.cpp
  * @brief Example using Trajopt for constrained cartesian planning
  *
- * @author Levi Armstrong
- * @date Dec 18, 2017
+ * @author Masaki Murooka
+ * @date Sep 27, 2018
  * @version TODO
  * @bug No known bugs
- *
- * @copyright Copyright (c) 2017, Southwest Research Institute
  *
  * @par License
  * Software License Agreement (Apache License)
@@ -49,7 +47,7 @@ urdf::ModelInterfaceSharedPtr urdf_model_; /**< URDF Model */
 srdf::ModelSharedPtr srdf_model_;          /**< SRDF Model */
 tesseract_ros::KDLEnvPtr env_;             /**< Trajopt Basic Environment */
 
-static VectorIsometry3d makePuzzleToolPoses()
+static VectorIsometry3d makeTracingPoses()
 {
   VectorIsometry3d path;  // results
   std::ifstream indata;            // input file
@@ -113,7 +111,7 @@ ProblemConstructionInfo cppMethod()
 {
   ProblemConstructionInfo pci(env_);
 
-  VectorIsometry3d tool_poses = makePuzzleToolPoses();
+  VectorIsometry3d tool_poses = makeTracingPoses();
 
   // Populate Basic Info
   pci.basic_info.n_steps = tool_poses.size();
@@ -186,7 +184,7 @@ ProblemConstructionInfo cppMethod()
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "puzzle_piece_auxilliary_axes_plan");
+  ros::init(argc, argv, "tracing_plan");
   ros::NodeHandle pnh("~");
   ros::NodeHandle nh;
 
@@ -234,7 +232,7 @@ int main(int argc, char** argv)
   TrajOptProbPtr prob = ConstructProblem(pci);
 
   // Solve Trajectory
-  ROS_INFO("puzzle piece plan");
+  ROS_INFO("tracing plan");
 
   std::vector<tesseract::ContactResultMap> collisions;
   ContinuousContactManagerBasePtr manager = prob->GetEnv()->getContinuousContactManager();
