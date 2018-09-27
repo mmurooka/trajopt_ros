@@ -59,7 +59,7 @@ static VectorIsometry3d makeTracingPoses()
 
   // You could load your parts from anywhere, but we are transporting them with
   // the git repo
-  std::string filename = ros::package::getPath("trajopt_examples") + "/config/puzzle_bent.csv";
+  std::string filename = ros::package::getPath("trajopt_examples") + "/config/circle.csv";
 
   // In a non-trivial app, you'll of course want to check that calls like 'open'
   // succeeded
@@ -100,9 +100,9 @@ static VectorIsometry3d makeTracingPoses()
     Eigen::Vector3d y_axis = (norm.cross(temp_x)).normalized();
     Eigen::Vector3d x_axis = (y_axis.cross(norm)).normalized();
     Eigen::Isometry3d pose;
-    pose.matrix().col(0).head<3>() = x_axis;
-    pose.matrix().col(1).head<3>() = y_axis;
-    pose.matrix().col(2).head<3>() = norm;
+    pose.matrix().col(0).head<3>() = norm;
+    pose.matrix().col(1).head<3>() = x_axis;
+    pose.matrix().col(2).head<3>() = y_axis;
     pose.matrix().col(3).head<3>() = pos;
 
     path.push_back(pose);
@@ -182,8 +182,8 @@ ProblemConstructionInfo cppMethod()
 
     pose->link = "RARM_JOINT5_Link";
     pose->tcp = tool_poses[i];
-    pose->pos_coeffs = Eigen::Vector3d(10, 10, 10);
-    pose->rot_coeffs = Eigen::Vector3d(10, 10, 0);
+    pose->pos_coeffs = Eigen::Vector3d(100, 100, 100);
+    pose->rot_coeffs = Eigen::Vector3d(0, 0, 0);
 
     pci.cnt_infos.push_back(pose);
   }
@@ -242,7 +242,12 @@ int main(int argc, char** argv)
   ipos["RARM_JOINT3"] = 0.26529;
   ipos["RARM_JOINT4"] = 0.164061;
   ipos["RARM_JOINT5"] = 0.055851;
-
+  ipos["LARM_JOINT0"] = 0.010472;
+  ipos["LARM_JOINT1"] = 0;
+  ipos["LARM_JOINT2"] = -1.74533;
+  ipos["LARM_JOINT3"] = -0.26529;
+  ipos["LARM_JOINT4"] = 0.164061;
+  ipos["LARM_JOINT5"] = -0.055851;
 
   env_->setState(ipos);
 
