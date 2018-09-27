@@ -40,3 +40,6 @@ target_link_libraries(${PROJECT_NAME}_car_seat_demo ${catkin_LIBRARIES})
 
 add_executable(${PROJECT_NAME}_puzzle_piece_auxillary_axes_plan src/puzzle_piece_auxillary_axes_plan.cpp)
 target_link_libraries(${PROJECT_NAME}_puzzle_piece_auxillary_axes_plan ${catkin_LIBRARIES})
+
+add_executable(${PROJECT_NAME}_tracing_plan src/tracing_plan.cpp)
+target_link_libraries(${PROJECT_NAME}_tracing_plan ${catkin_LIBRARIES})
