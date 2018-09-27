@@ -30,6 +30,9 @@
 #include <trajopt_utils/config.hpp>
 #include <trajopt_utils/logging.hpp>
 #include <urdf_parser/urdf_parser.h>
+#include <geometry_msgs/PoseArray.h>
+#include <eigen_conversions/eigen_msg.h>
+
 
 // For loading the pose file from a local package
 #include <fstream>
@@ -46,6 +49,8 @@ bool plotting_ = false;
 urdf::ModelInterfaceSharedPtr urdf_model_; /**< URDF Model */
 srdf::ModelSharedPtr srdf_model_;          /**< SRDF Model */
 tesseract_ros::KDLEnvPtr env_;             /**< Trajopt Basic Environment */
+
+ros::Publisher cart_traj_pub_;
 
 static VectorIsometry3d makeTracingPoses()
 {
@@ -124,6 +129,7 @@ ProblemConstructionInfo cppMethod()
 
   // Create Kinematic Object
   pci.kin = pci.env->getManipulator(pci.basic_info.manip);
+  ROS_INFO("Movegroup: %s", pci.kin->getName().c_str());
 
   // Populate Init Info
   Eigen::VectorXd start_pos = pci.env->getCurrentJointValues(pci.kin->getName());
@@ -182,6 +188,18 @@ ProblemConstructionInfo cppMethod()
     pci.cnt_infos.push_back(pose);
   }
 
+  // publish PoseArray of cartesian trajectory
+  geometry_msgs::PoseArray pose_array_msg;
+  pose_array_msg.header.frame_id = "WAIST";
+  pose_array_msg.header.stamp = ros::Time::now();
+  for (auto i = 0; i < pci.basic_info.n_steps; ++i)
+  {
+    geometry_msgs::Pose pose_msg;
+    tf::poseEigenToMsg(tool_poses[i], pose_msg);
+    pose_array_msg.poses.push_back(pose_msg);
+  }
+  cart_traj_pub_.publish(pose_array_msg);
+
   return pci;
 }
 
@@ -205,6 +223,9 @@ int main(int argc, char** argv)
 
   bool success = env_->init(urdf_model_, srdf_model_);
   assert(success);
+
+  // Publisher
+  cart_traj_pub_ = nh.advertise<geometry_msgs::PoseArray>("target_cartesian_trajectory", 1, true);
 
   // Create plotting tool
   tesseract_ros::ROSBasicPlottingPtr plotter(new tesseract_ros::ROSBasicPlotting(env_));
