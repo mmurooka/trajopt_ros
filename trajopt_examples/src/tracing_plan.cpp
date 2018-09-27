@@ -115,7 +115,7 @@ ProblemConstructionInfo cppMethod()
 
   // Populate Basic Info
   pci.basic_info.n_steps = tool_poses.size();
-  pci.basic_info.manip = "manipulator_aux";
+  pci.basic_info.manip = "right_arm";
   pci.basic_info.start_fixed = false;
 
   pci.opt_info.max_iter = 200;
