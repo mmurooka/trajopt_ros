@@ -134,20 +134,23 @@ ProblemConstructionInfo cppMethod()
   //  end_pos[6]);
 
   // Populate Cost Info
+  unsigned int num_joints = pci.kin->numJoints();
+  ROS_INFO("Number of joints: %d", num_joints);
+
   std::shared_ptr<JointVelCostInfo> joint_vel = std::shared_ptr<JointVelCostInfo>(new JointVelCostInfo);
-  joint_vel->coeffs = std::vector<double>(9, 1.0);
+  joint_vel->coeffs = std::vector<double>(num_joints, 1.0); // <= depends on joint_number
   joint_vel->name = "joint_vel";
   joint_vel->term_type = TT_COST;
   pci.cost_infos.push_back(joint_vel);
 
   std::shared_ptr<JointAccCostInfo> joint_acc = std::shared_ptr<JointAccCostInfo>(new JointAccCostInfo);
-  joint_acc->coeffs = std::vector<double>(9, 2.0);
+  joint_acc->coeffs = std::vector<double>(num_joints, 2.0);
   joint_acc->name = "joint_acc";
   joint_acc->term_type = TT_COST;
   pci.cost_infos.push_back(joint_acc);
 
   std::shared_ptr<JointJerkCostInfo> joint_jerk = std::shared_ptr<JointJerkCostInfo>(new JointJerkCostInfo);
-  joint_jerk->coeffs = std::vector<double>(9, 5.0);
+  joint_jerk->coeffs = std::vector<double>(num_joints, 5.0);
   joint_jerk->name = "joint_jerk";
   joint_jerk->term_type = TT_COST;
   pci.cost_infos.push_back(joint_jerk);
@@ -168,10 +171,10 @@ ProblemConstructionInfo cppMethod()
     std::shared_ptr<PoseCostInfo> pose = std::shared_ptr<PoseCostInfo>(new PoseCostInfo);
     pose->term_type = TT_CNT;
     pose->name = "waypoint_cart_" + std::to_string(i);
-    pose->target = "grinder_frame";
+    pose->target = "WAIST";
     pose->timestep = i;
 
-    pose->link = "part";
+    pose->link = "RARM_JOINT5_Link";
     pose->tcp = tool_poses[i];
     pose->pos_coeffs = Eigen::Vector3d(10, 10, 10);
     pose->rot_coeffs = Eigen::Vector3d(10, 10, 0);
@@ -211,15 +214,15 @@ int main(int argc, char** argv)
 
   // Set the robot initial state
   std::unordered_map<std::string, double> ipos;
-  ipos["joint_a1"] = -0.785398;
-  ipos["joint_a2"] = 0.4;
-  ipos["joint_a3"] = 0.0;
-  ipos["joint_a4"] = -1.9;
-  ipos["joint_a5"] = 0.0;
-  ipos["joint_a6"] = 1.0;
-  ipos["joint_a7"] = 0.0;
-  ipos["joint_aux1"] = 0.0;
-  ipos["joint_aux2"] = 0.0;
+  // ipos["CHEST_JOINT0"] = 0;
+  ipos["RARM_JOINT0"] = -0.010472;
+  ipos["RARM_JOINT1"] = 0;
+  ipos["RARM_JOINT2"] = -1.74533;
+  ipos["RARM_JOINT3"] = 0.26529;
+  ipos["RARM_JOINT4"] = 0.164061;
+  ipos["RARM_JOINT5"] = 0.055851;
+
+
   env_->setState(ipos);
 
   plotter->plotScene();
