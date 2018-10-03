@@ -7,7 +7,7 @@
   <arg name="plotting" default="true"/>
 
   <!-- Load universal robot description format (URDF) -->
-  <param name="$(arg trajopt_description)" textfile="$(find trajopt_examples)/config/basic_cartesian_plan.json"/>
+  <param name="$(arg trajopt_description)" textfile="$(find trajopt_examples)/config/adept_cycle_plan.json"/>
 
   <!-- Load universal robot description format (URDF) -->
   <param name="$(arg robot_description)" command="$(find xacro)/xacro --inorder '$(find trajopt_examples)/urdf/lbr_iiwa_14_r820.xacro'" />
