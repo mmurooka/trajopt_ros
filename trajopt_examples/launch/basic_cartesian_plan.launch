@@ -31,6 +31,7 @@
   <node pkg="trajopt_examples" type="trajopt_examples_basic_cartesian_plan" name="trajopt_examples_basic_cartesian_plan"
         output="screen" >
     <param name="plotting" type="bool" value="$(arg plotting)"/>
+    <param name="enable_obstacle" type="bool" value="false" />
   </node>
 
 </launch>

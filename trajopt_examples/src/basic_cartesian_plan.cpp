@@ -57,6 +57,7 @@ std::string method_ = "json";
 urdf::ModelInterfaceSharedPtr urdf_model_; /**< URDF Model */
 srdf::ModelSharedPtr srdf_model_;          /**< SRDF Model */
 tesseract_ros::KDLEnvPtr env_;             /**< Trajopt Basic Environment */
+bool enable_obstacle_ = true;
 
 TrajOptProbPtr jsonMethod()
 {
@@ -151,41 +152,47 @@ int main(int argc, char** argv)
   bool success = env_->init(urdf_model_, srdf_model_);
   assert(success);
 
-  pcl::PointCloud<pcl::PointXYZ> full_cloud;
-  double delta = 0.05;
-  int length = (1 / delta);
+  pnh.param<bool>("enable_obstacle", enable_obstacle_, enable_obstacle_);
 
-  for (int x = 0; x < length; ++x)
-    for (int y = 0; y < length; ++y)
-      for (int z = 0; z < length; ++z)
-        full_cloud.push_back(pcl::PointXYZ(-0.5 + x * delta, -0.5 + y * delta, -0.5 + z * delta));
+  if (enable_obstacle_) {
+    ROS_INFO("enable obstacle.");
 
-  sensor_msgs::PointCloud2 pointcloud_msg;
-  pcl::toROSMsg(full_cloud, pointcloud_msg);
+    pcl::PointCloud<pcl::PointXYZ> full_cloud;
+    double delta = 0.05;
+    int length = (1 / delta);
 
-  octomap::Pointcloud octomap_data;
-  octomap::pointCloud2ToOctomap(pointcloud_msg, octomap_data);
-  octomap::OcTree* octree = new octomap::OcTree(2 * delta);
-  octree->insertPointCloud(octomap_data, octomap::point3d(0, 0, 0));
+    for (int x = 0; x < length; ++x)
+      for (int y = 0; y < length; ++y)
+        for (int z = 0; z < length; ++z)
+          full_cloud.push_back(pcl::PointXYZ(-0.5 + x * delta, -0.5 + y * delta, -0.5 + z * delta));
 
-  AttachableObjectPtr obj(new AttachableObject());
-  shapes::OcTree* octomap_world = new shapes::OcTree(std::shared_ptr<const octomap::OcTree>(octree));
-  Eigen::Isometry3d octomap_pose;
+    sensor_msgs::PointCloud2 pointcloud_msg;
+    pcl::toROSMsg(full_cloud, pointcloud_msg);
 
-  octomap_pose.setIdentity();
-  octomap_pose.translation() = Eigen::Vector3d(1, 0, 0);
+    octomap::Pointcloud octomap_data;
+    octomap::pointCloud2ToOctomap(pointcloud_msg, octomap_data);
+    octomap::OcTree* octree = new octomap::OcTree(2 * delta);
+    octree->insertPointCloud(octomap_data, octomap::point3d(0, 0, 0));
 
-  obj->name = "octomap_attached";
-  obj->collision.shapes.push_back(shapes::ShapeConstPtr(octomap_world));
-  obj->collision.shape_poses.push_back(octomap_pose);
-  obj->collision.collision_object_types.push_back(CollisionObjectType::UseShapeType);
-  env_->addAttachableObject(obj);
+    AttachableObjectPtr obj(new AttachableObject());
+    shapes::OcTree* octomap_world = new shapes::OcTree(std::shared_ptr<const octomap::OcTree>(octree));
+    Eigen::Isometry3d octomap_pose;
 
-  AttachedBodyInfo attached_body;
-  attached_body.object_name = "octomap_attached";
-  attached_body.parent_link_name = "base_link";
-  attached_body.transform = Eigen::Isometry3d::Identity();
-  env_->attachBody(attached_body);
+    octomap_pose.setIdentity();
+    octomap_pose.translation() = Eigen::Vector3d(1, 0, 0);
+
+    obj->name = "octomap_attached";
+    obj->collision.shapes.push_back(shapes::ShapeConstPtr(octomap_world));
+    obj->collision.shape_poses.push_back(octomap_pose);
+    obj->collision.collision_object_types.push_back(CollisionObjectType::UseShapeType);
+    env_->addAttachableObject(obj);
+
+    AttachedBodyInfo attached_body;
+    attached_body.object_name = "octomap_attached";
+    attached_body.parent_link_name = "base_link";
+    attached_body.transform = Eigen::Isometry3d::Identity();
+    env_->attachBody(attached_body);
+  }
 
   // Create plotting tool
   tesseract_ros::ROSBasicPlottingPtr plotter(new tesseract_ros::ROSBasicPlotting(env_));
